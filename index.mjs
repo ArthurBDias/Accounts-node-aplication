@@ -47,7 +47,7 @@ function operation() {
             withdraw()
         }
         else if(action === 'Tranferir'){
-            getAccountBalance()
+            transfer()
         }
         else if(action === 'Sair'){
             console.clear()
@@ -167,7 +167,7 @@ function deposit() {
             message: 'Qual o valor que você deseja depositar?'
         }])
         .then((answers) => {
-            const amount = answers['amount']
+            const amount = answers['amount'].replace(",", ".")
 
             //add an amount
 
@@ -200,12 +200,61 @@ function withdraw() {
         }])
         .then((answers) =>{
             
-            const amount = answers['amount']
-            removeAmount(accountName, amount)
+            const amount = answers['amount'].replace(",", ".")
+            removeAmount(accountName, amount, withdraw)
+            operation()
         })
         
     })
     .catch(err => console.log(err))
+}
+
+function transfer(){
+
+    inquirer.prompt([{
+        name: 'transferAccount',
+        message: 'Insira o node da conta que ira transferir o dinheiro'
+    }])
+    .then((answers) => {
+
+        const transferAccount = answers['transferAccount']
+
+        if(!checkAccount(transferAccount)){
+            return transfer()
+        }
+
+        inquirer.prompt([{
+            name: 'receiptAccount',
+            message: 'Insira o node da conta que ira transferir o dinheiro'
+        }])
+        .then((answers) => {
+            
+            const receiptAccount = answers['receiptAccount']
+
+            if(!checkAccount(receiptAccount)){
+                return transfer()
+            }
+
+            inquirer.prompt([{
+                name: 'amount',
+                message: 'Qual o valor que deseja transferir'
+            }])
+            .then((answers) =>{
+                
+                const amount = answers['amount'].replace(',', '.')
+
+                transferAmount(transferAccount, receiptAccount, amount)
+            })
+            .catch(err => console.log(err))
+                
+            })
+            
+            
+        .catch(err => console.log(err))
+
+    })
+    .catch(err => console.log(err))
+
 }
 
 function buildAccount() {
@@ -223,7 +272,7 @@ function buildAccount() {
             })
         }
 
-        if(checkAccount(accountName)){
+        if(fs.existsSync(`./accounts/${accountName}.json`)){
             console.log(chalk.bgRed.bold("Esta conta ja exite, escolha outro nome!"))
             return buildAccount()
         }
@@ -270,13 +319,18 @@ function deleteAccount() {
 
 }
 
-function addAmount(accountName, amount) {
+function addAmount(accountName, amount, func) {
 
     const accountData = getAccount(accountName)
 
-    if(!amount || amount <= 0){
+    if(isNaN(parseFloat(amount))){
+        console.log(chalk.bgRed('Valor digitado não é numerico!'))
+        return func()
+    }
+
+    if(amount <= 0){
         console.log(chalk.bgRed.white.bold('Ocoreu um erro, tente novamente mais tarde!'))
-        return deposit()
+        return func()
     }
 
     accountData.balance = parseFloat(amount) + parseFloat(accountData.balance)
@@ -285,18 +339,18 @@ function addAmount(accountName, amount) {
     console.log(chalk.green.bold(`O valor de R$${amount} foi depositado na sua conta!`))
 }
 
-function removeAmount(accountName, amount) {
+function removeAmount(accountName, amount, func) {
 
     const accountData = getAccount(accountName)
 
-    if(!amount){
-        console.log(chalk.bgRed('Ocoreu um erro, tente novamente mais tarde!'))
-        return removeAmount()
+    if(isNaN(parseFloat(amount))){
+        console.log(chalk.bgRed('Valor digitado não é numerico!'))
+        return func()
     }
 
     if(accountData.balance < amount){
         console.log(chalk.bgRed('Valor indisponivel!'))
-        return withdraw()
+        return func()
     }
 
     accountData.balance = parseFloat(accountData.balance) - parseFloat(amount)
@@ -306,8 +360,14 @@ function removeAmount(accountName, amount) {
     })
 
     console.log(chalk.green.bold(`Foi realizado um saque de R$${amount} da sua conta!`))
-    operation()
 
+}
+
+function transferAmount(transferAccount, receiptAccount, amount){
+
+    removeAmount(transferAccount, amount, transfer)
+    addAmount(receiptAccount, amount, transfer)
+    operation()
 }
 
 function checkAccount(accountName){
